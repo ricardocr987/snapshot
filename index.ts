@@ -11,16 +11,14 @@ async function getAccounts(connection: Connection) {
   );
 
   for (const account of accounts){
-    if(account.pubkey.toString() == '6yZ65vJJ3cNGnysVxujkYktRdGtKEdVXSbtb7JQmh7dJ'){
-        console.log(account)
-    }
+    console.log(account)
   }
   console.log(await connection.getAccountInfo(new PublicKey('6yZ65vJJ3cNGnysVxujkYktRdGtKEdVXSbtb7JQmh7dJ')))
   return accounts;
 };
 
 const connection = new Connection(
-    "https://wild-hidden-sky.solana-mainnet.quiknode.pro/7fd663b97aa09842059a88da476fb21e22cb3ba2/"
+    "https://api.mainnet-beta.solana.com"
 );
 
 getAccounts(connection);
