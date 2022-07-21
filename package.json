@@ -4,6 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "start": "ts-node index.ts",
     "build": "tsc"
@@ -11,6 +12,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@project-serum/anchor": "^0.25.0",
+    "@solana/spl-token": "^0.2.0",
     "@solana/web3.js": "^1.48.0"
   },
   "devDependencies": {
