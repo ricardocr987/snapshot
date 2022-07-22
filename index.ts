@@ -182,7 +182,6 @@ async function getBorgsHoldersWallets(connection: Connection): Promise<PublicKey
 */
 
 const connection = new Connection(
-    "https://wild-hidden-sky.solana-mainnet.quiknode.pro/7fd663b97aa09842059a88da476fb21e22cb3ba2/"
 );
 
 
