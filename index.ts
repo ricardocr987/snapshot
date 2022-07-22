@@ -1,5 +1,5 @@
 import { Connection, PublicKey, AccountInfo, ParsedAccountData, ConfirmedSignatureInfo, RpcResponseAndContext } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID, AccountLayout } from "@solana/spl-token";
+import { AccountLayout } from "@solana/spl-token";
 import { writeFileSync, readFileSync } from 'fs';
 import { format, Options } from 'prettier'
 
@@ -18,9 +18,31 @@ type Account = {
   account: AccountInfo<Buffer | ParsedAccountData>;
 }
 
-type NFT = {
-    holdingTime: number,
+type HolderData = {
+    holderMints: string[],
+    amountBorgs: number
 }
+
+async function getAmountBorgs(connection: Connection, pubkey: PublicKey) {
+    let amount = 0
+    const tokenAccounts: RpcResponseAndContext<Account[]> = await connection.getTokenAccountsByOwner(
+        pubkey,     
+        { 
+            programId: new PublicKey("36EsmEsa5rp3VrZAzLna3UFDEBFihwjsRFciUTfoZ5Qt")
+        }
+    )
+    for(const tokenAccount of tokenAccounts.value){
+        const accountInfo = await connection.getAccountInfo(
+            tokenAccount.pubkey
+        );
+        const accountDataEncoded = accountInfo?.data
+        if(accountDataEncoded != undefined){
+            const accountData = AccountLayout.decode(accountDataEncoded); // decoding AccountInfo with borsh to get the data
+            amount = Number(accountData.amount);
+        }
+    }
+    return amount;
+};
 
 async function getTokenAccounts(connection: Connection, pubkey: PublicKey) {
     const tokenAccounts: RpcResponseAndContext<Account[]> = await connection.getTokenAccountsByOwner(
@@ -33,8 +55,8 @@ async function getTokenAccounts(connection: Connection, pubkey: PublicKey) {
 };
 // hasmap -> clave pubkey, objecto (numero de nfts, tiempo holdeado, cantidad borgs), 
 // holding time -> borgs
-async function getBotborgsHoldersWallet(connection: Connection, programSignatures: ConfirmedSignatureInfo[], holders: Record<string, Record<string, NFT>>): Promise<Record<string, Record<string, NFT>>>{
-    let holderInfo: Record<string, Record<string, NFT>> = holders
+async function getBotborgsHoldersWallet(connection: Connection, programSignatures: ConfirmedSignatureInfo[], holders: Record<string, HolderData>): Promise<Record<string, HolderData>> {
+    let holderInfo: Record<string, HolderData> = holders
     let positionStartReadingSignatures = -2100
     let siguientesSignatures = programSignatures.slice(-positionStartReadingSignatures)
     for(const programSignature of siguientesSignatures) {
@@ -46,7 +68,8 @@ async function getBotborgsHoldersWallet(connection: Connection, programSignature
         console.log(positionStartReadingSignatures)
         if(transaction != undefined){
             if(holderInfo[transaction.transaction.message.accountKeys[0].toString()] == undefined){
-                let nftInfo: Record<string, NFT> = {}
+                const amountBorgs = await getAmountBorgs(connection, transaction.transaction.message.accountKeys[0])
+                let holderMints: string[] = []
                 let index = 0
                 let found = false
                 for(const account of transaction.transaction.message.accountKeys) {
@@ -71,22 +94,14 @@ async function getBotborgsHoldersWallet(connection: Connection, programSignature
                         if(accountDataEncoded != undefined){
                             const accountData = AccountLayout.decode(accountDataEncoded); // decoding AccountInfo with borsh to get the data
                             const nftMint = accountData.mint.toString();
-                            /*let mintSignatures: ConfirmedSignatureInfo[] = await getSignatures(connection, nftMint);
-                            const blocktime = mintSignatures[0].blockTime;
-                            let totalDays: number = 0;
-                            if(typeof blocktime == "number"){
-                                let today = new Date();
-                                let staked = new Date(blocktime)
-                                let difference = today.getTime() - staked.getTime();
-                                totalDays = Math.floor(difference/1000/60/60/24);
-                            }*/
-                            const nftData: NFT = {
-                                holdingTime: 19176
-                            }
-                            nftInfo[nftMint] = nftData;
+                            holderMints.push(nftMint)
                         }
                     }
-                    holderInfo[transaction.transaction.message.accountKeys[0].toString()] = nftInfo;
+                    const holderData: HolderData = {
+                        holderMints: holderMints,
+                        amountBorgs: amountBorgs
+                    }
+                    holderInfo[transaction.transaction.message.accountKeys[0].toString()] = holderData;
                     writeFileSync(`./holders/${Object.keys(holderInfo).length}.json`, format(JSON.stringify(holderInfo).trim(), options));
                 }
             }
@@ -116,7 +131,7 @@ async function getSignatures(connection: Connection, pubkey: string) {
     return totalSignatures
 };
 
-
+/*
 async function getBorgsHoldersWallets(connection: Connection): Promise<PublicKey[]> {
     const tokenAccounts: Account[] = await connection.getParsedProgramAccounts(
         // SPL Token Account (Size in Bytes): 32 (mint) + 32 (owner) + 8 (amount) + 36 (delegate) + 1 (state) + 12 (is_native) + 8 (delegated_amount) + 36 (close_authority)
@@ -160,18 +175,17 @@ async function getBorgsHoldersWallets(connection: Connection): Promise<PublicKey
     );
     return holdersWallet;
 };
+*/
 
 const connection = new Connection(
-    "https://wild-hidden-sky.solana-mainnet.quiknode.pro/7fd663b97aa09842059a88da476fb21e22cb3ba2/"
+    ""
 );
 
 
-const holders: Record<string, Record<string, NFT>> = JSON.parse(readFileSync('./holders/681.json', 'utf8'))
+const holders: Record<string, HolderData> = JSON.parse(readFileSync('./holders/681.json', 'utf8'))
 
-const borgsHoldersWallet: PublicKey[] = await getBorgsHoldersWallets(connection);
 const programSignatures: ConfirmedSignatureInfo[] = await getSignatures(connection, '8Lhgy2yNAegAKhL4Mky4bnUBFVSWfzwLZVWaZGGkWKdV');
-const botborgsHoldersWallet: Record<string, Record<string, NFT>> = {} = await getBotborgsHoldersWallet(connection, programSignatures, holders);
-writeFileSync('./holderList.json', format(JSON.stringify(botborgsHoldersWallet), options));
+const stakersMap: Record<string, HolderData> = await getBotborgsHoldersWallet(connection, programSignatures, holders);
 
-console.log('BorgsHolders: ' + borgsHoldersWallet.length + ' ProgramSignatures: ' + programSignatures.length + ' BotborgsHolders: ' + Object.keys(botborgsHoldersWallet).length)
+console.log('ProgramSignatures: ' + programSignatures.length + ' BotborgsHolders: ' + Object.keys(stakersMap).length)
 console.log('Success')
