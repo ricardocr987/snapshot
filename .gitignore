@@ -1,3 +1,13 @@
 node_modules
+/holders/
+/baseAssets/
+/assets/
+.env
+/test
+/devnet
 /dist
-/holders
+/snapshot
+/airdrop
+/hashmint
+/backup
+/candyMachineConfigBotborgs
